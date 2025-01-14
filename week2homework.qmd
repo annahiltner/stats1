@@ -1,0 +1,94 @@
+---
+title: "Week 2 Homework"
+author: "Anna Hiltner Nouzeilles"
+format: html
+---
+
+---
+title: "Week 2 Homework"
+author: "Anna Hiltner Nouzeilles"
+format: html
+---
+
+## This is my homework for week 2
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+library(tidyverse)
+library(gapminder)
+library(tinytable)
+library(knitr)
+library(kableExtra)
+library (ggplot2)
+
+theme_set(theme_light())
+
+gapminder |> view()
+
+#| echo: false
+data(gapminder) 
+d <- gapminder |> 
+  filter(year == 1957) #keep 1957
+```
+## Univariate Plots
+Below is my univariate density plot
+```{r}
+# below is my univariate density plot
+ggplot(d,
+       aes(x = lifeExp)) +
+  geom_density()
+```
+Below is my univariate histogram
+```{r}
+ggplot(d,
+       aes(x = lifeExp)) +
+  geom_histogram(binwidth = 10,
+                 boundary = 0,
+                 color = 'white')
+```
+Below is my univariate bar graph 
+```{r}
+ggplot(d, 
+       aes(x = continent)) + 
+         geom_bar()
+```
+## Bivariate Plots
+Below is my bivariate scatterplot
+```{r}
+ggplot(d, 
+       aes(x = lifeExp,
+           y = continent)) + 
+  geom_point()
+```
+
+Below is my bivariate bar graph
+```{r}
+d |>
+  group_by(continent) |>
+  summarise(average_lifeExp = mean(lifeExp)) |>
+  ggplot(aes(x = continent, y = average_lifeExp, fill = continent)) + 
+  geom_bar(stat = "identity")
+```
+
+Below is my bivariate strip plot
+```{r}
+ggplot(d,
+       aes(x = lifeExp,
+           y = continent)) +
+  geom_jitter(height = .1,
+              width = .1,
+              alpha = .3)
+```
+
+Below is my bivariate time plot
+```{r}
+gapminder |>
+  group_by(year) |>
+  summarise(average_lifeExp = mean(lifeExp)) |>
+  ggplot(aes(x = year, y = average_lifeExp)) +
+  geom_line(color = "black", size = 1)
+```
+  
