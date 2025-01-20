@@ -1,0 +1,178 @@
+---
+title: "Week 3 Homework"
+format: html
+editor: visual
+---
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+library(tidyverse)
+library(gapminder)
+library(tinytable)
+library(knitr)
+library(kableExtra)
+library (ggplot2)
+
+theme_set(theme_light())
+
+```
+
+# Here we have a population of 100,000 adults. Of these, 80,000 (i.e., 80%) use social media.
+
+```{r}
+population <- tibble(id = 1:1e5) |> 
+  mutate(socialmedia = if_else(id <= 80000, "Yes", "No"))
+```
+
+# Here is the population visualized
+
+```{r}
+#| echo: false
+
+ggplot(population,
+       aes(x = socialmedia)) +
+  geom_bar()
+```
+
+# Since 'socialmedia' is a character variable, I add 'socialmedia_num' as an integer variable
+
+```{r}
+population <- population |> 
+  mutate(socialmedia_num = if_else(socialmedia == "Yes", 1L, 0L))
+```
+
+# Below I set the sample we will use as 2000 people. `set.seed()` ensures that the result we get is reproducible and `replace = FALSE` ensures that we are sampling without replacement.
+
+```{r}
+set.seed(456)
+my_sample <- population |> 
+  slice_sample(n = 2000,
+               replace = FALSE)
+```
+
+# Here you can see that about 80% of the sample uses social media
+
+```{r}
+my_sample |> 
+  group_by(socialmedia) |> 
+  summarize(n = n())
+```
+
+# Below is a custom function that takes a sample from a group of 2k people from the population of 100k, counts the number of people who use social media, and saves the number as an integer.
+
+```{r}
+get_count <- function(n = 2000) {       
+  slice_sample(population, n = n) |>    
+    summarize(sum = sum(socialmedia_num)) |> 
+    as.integer()                        
+}
+```
+
+# This function creates a tibble with the column `sample_id` that has integers from 1 to 100. `rowwise` allows the `get_count` function to be applied to each row. The last line displays the first three rows of the resulting `my_samples` tibble.
+
+```{r}
+set.seed(456)
+my_samples <- tibble(
+  sample_id = 1:100) |> 
+  rowwise() |> 
+  mutate(samp_count = get_count(n = 2000))
+head(my_samples, n = 3)
+```
+
+# Visualizing n = 2000
+
+```{r}
+#| output-location: slide
+#| fig-height: 5
+
+ggplot(my_samples,
+       aes(x = samp_count)) +
+  geom_histogram(aes(y = after_stat(density)), # for overlay
+                 boundary = 1600,    
+                 binwidth = 2.5,    
+                 color = "white",
+                 fill = "lightpink") +
+  geom_density(color = "#36454f",   
+               linewidth = 1,
+               alpha = .5)      
+```
+
+# Repeating with 3000 samples
+
+```{r}
+#| echo: false
+#| warning: false
+#| cache: true
+#| fig-align: center
+#| fig-height: 5
+
+set.seed(456)
+my_many_samples <- tibble(
+  sample_id = 1:3000) |> 
+  rowwise() |> 
+  mutate(samp_count = get_count())
+
+ggplot(my_many_samples,
+            aes(x = samp_count)) +
+  geom_histogram(aes(y = after_stat(density)),
+                 boundary = 2400, 
+                 binwidth = 5,   
+                 color = "white",
+                 fill = "lightblue") +
+  scale_x_continuous(breaks = seq(2000, 2500, 50)) +
+  geom_density(color = "#36454f",  
+               linewidth = 1,
+               alpha = .5)    
+```
+
+# Here I compare samples with n = 250, 500, and 2000. `my_n250_samples` and `my_n500_samples` are data frames with 2500 observations, based on a sample size of n = 250 and 500 respectively. `my_many_samples` updates the earlier data frame to include a new column `samp_pop` which is the proportion of the sample count relative to sample size. `bind_rows()` combines all three into one data frame called `samp_size_compare`. I then plot the density curves of the different sample proportions with ggplot.
+
+```{r}
+#| echo: false
+#| fig-align: center
+
+set.seed(456)
+my_n250_samples <- tibble(
+  sample_id = 1:2500,
+  sample_size = "N = 250") |> 
+  rowwise() |> 
+  mutate(samp_count = get_count(n = 250),
+         samp_prop = samp_count / 250)    
+
+my_n500_samples <- tibble(
+  sample_id = 1:2500,
+  sample_size = "N = 500") |> 
+  rowwise() |> 
+  mutate(samp_count = get_count(n = 500),
+         samp_prop = samp_count / 500)
+
+my_many_samples <- my_many_samples |> 
+  mutate(sample_size = "N = 2000",
+         samp_prop = samp_count / 2000)
+
+samp_size_compare <- 
+  bind_rows(my_n250_samples,
+            my_n500_samples,
+            my_many_samples)
+
+ggplot(samp_size_compare,
+       aes(x = samp_prop,
+           group = sample_size,
+           color = sample_size)) +
+  geom_density()
+```
+
+# As the sample size increases, the interquartile range decreases
+
+```{r}
+#| echo: false
+
+samp_size_compare |>              
+  group_by(sample_size) |>        
+  summarize(IQR = IQR(samp_prop))
+```
+
+------------------------------------------------------------------------
