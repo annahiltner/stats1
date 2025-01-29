@@ -1,0 +1,238 @@
+---
+title: "Week 3 Homework"
+format: html
+editor: visual
+---
+Anna Hiltner Nouzeilles
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+library(tidyverse)
+library(gapminder)
+library(tinytable)
+library(knitr)
+library(kableExtra)
+library(ggplot2)
+library(dplyr)
+library(haven)
+
+theme_set(theme_light())
+
+#| output-location: slide
+
+gss2022 <- read_dta("https://raw.githubusercontent.com/vaiseys/soc-stats-1/main/data/GSS2022.dta", encoding = "UTF-8")
+
+```
+
+## Example #1: Probability of supporting Euthanasia and being Male
+
+In the 2022 GSS, sample respondents are asked the following question: **"When a person has a disease that cannot be cured, do you think doctors should be allowed by law to end the patient's life by some painless means if the patient and his family request it?"** They can either respond yes, $Y$, or no, $N$, to this question. $Y = \neg N$ and $\Omega = \{Y, \neg Y\}$
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+table(factor(gss2022$letdie1, 
+             levels = c(1, 2), 
+             labels = c("Yes", "No")))
+```
+
+Since 75% of sample respondents said yes, we can say $P(Y) = .75$ and $P(\neg Y) = .25$
+
+The following shows the number of respondents that are Male or Female. $P(Male) = .46$ and $P(\neg Male) = .54$
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+table(factor(gss2022$sex, 
+             levels = c(1, 2), 
+             labels = c("Male", "Female")))
+```
+
+## Contingency table with multiple attributes
+
+Now we will consider whether each respondent supports euthanasia and whether the respondent is male or female.
+
+```{r}
+d <- gss2022 |> 
+  select(letdie1, sex) |>    
+  drop_na() |>                     
+  mutate(euth_support = if_else(letdie1 == 1, 
+                           "Support", 
+                           "Oppose"),   
+    sex = if_else(sex == 1, 
+                  "Male", 
+                  "Female")          
+  ) |> 
+  select(euth_support, sex) 
+```
+
+```{r}
+#| echo: false
+library(tinytable)
+
+ct <- d |>
+  mutate(euth_support = factor(euth_support, levels = c("Support", "Oppose"))) |>
+  group_by(euth_support, sex) |> 
+  tally() |> 
+  pivot_wider(names_from = euth_support, values_from = n)
+
+tt(ct)
+```
+
+## Marginal probability
+
+The **marginal probability** of being a male can be calculated with the following equation:
+
+\$\$
+P(\\text{Male}) = \\frac{\\text{Number of Males}}{\\text{Total Population}}
+\$\$
+
+This gives us $P(\text{Male}) = .445$.
+
+Using the same equation, but with supporting euthanasia as the variable, the **marginal probability** of supporting euthanasia is $P(\text{Support Euthanasia})$ = .75
+
+## Joint probability
+
+The **joint probability** is calculated by dividing the number of cases where the respondent is both male and supports euthanasia, by the total number of cases:
+
+\$\$
+P(\\text{Male} \\cap \\text{Support Euthanasia})
+\$\$
+
+405 / 1167 = .35
+
+## Conditional probability
+
+The probability of supporting euthanasia *conditional* on being male:
+
+\$\$
+P(\\text{SE} \| \\text{M}) = \\frac{P(SE \\cap M)}{P(M)}
+\$\$
+
+In other words, this is the joint probability of supporting euthanasia and being male divided by the marginal probability of being male.
+
+.35 / .445 = .79
+
+## Example #2: Probability of Owning a Gun and Trusting Others
+
+My second example uses the variables of owning a gun and trusting others. The questions are worded as follows in the 2022 GSS:
+
+**"Do you happen to have in your home (IF HOUSE: or garage) any guns or revolvers?" Response Categories: 'Yes', 'No', 'Refused'"**
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+table(gss2022$owngun)
+```
+
+**"Generally speaking, would you say that most people can be trusted or that you can't be too careful in dealing with people?" Response Categories: 'Can trust', 'Can't be too careful', 'Depends'"**
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+table(gss2022$trustv)
+```
+
+**However, we will only be analyzing the first two response categories for each question:**
+
+*Trusts Others*
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+table(factor(gss2022$trustv, 
+             levels = c(1, 2), 
+             labels = c("Trust", "    Can't be too careful")))
+```
+
+Since 27.5% of sample respondents said yes, we can say $P(Y) = .275$ and $P(\neg Y) = .725$ for trusting others.
+
+*Owns a Gun*
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+table(factor(gss2022$owngun,
+             levels = c(1, 2),
+             labels = c("Yes", "No")))
+```
+
+Since 32.9% of sample respondents said yes, we can say $P(Y) = .329$ and $P(\neg Y) = .671$ for owning a gun.
+
+## Contingency table with Multiple attributes
+
+Now we will consider whether each respondent owns a gun and whether the respondent is trusting of others.
+
+```{r}
+d <- gss2022 |> 
+  select(trustv, owngun) |>    
+  drop_na() |>                     
+  mutate(trusts_others = if_else(trustv == 1, 
+                           "Trust", 
+                           "Can't be too careful"),   
+    owns_gun = if_else(owngun == 1, 
+                  "Yes", 
+                  "No")          
+  ) |> 
+  select(trusts_others, owns_gun) 
+```
+
+```{r}
+#| echo: false
+library(tinytable)
+
+ct <- d |>
+  mutate(trusts_others = factor(trusts_others, levels = c("Trust", "Can't be too careful"))) |>
+  group_by(trusts_others, owns_gun) |> 
+  tally() |> 
+  pivot_wider(names_from = trusts_others, values_from = n)|> 
+  rename("Owns Gun" = owns_gun)
+
+tt(ct)
+```
+
+## Marginal probability
+
+The **marginal probability** of owning a gun can be calculated with the following equation:
+
+\$\$
+P(\\text{Owns Gun}) = \\frac{\\text{Number of respondents that own guns}}{\\text{Total Population}}
+\$\$
+
+This gives us $P(\text{Owns Gun}) = .32$.
+
+The **marginal probability** of trusting others is $P(\text{Trusts Others})$ = .2
+
+## Joint probability
+
+The **joint probability** is calculated with the following equation:
+
+\$\$
+P(\\text{Owns Gun} \\cap \\text{Trusts Others})
+\$\$
+
+32 / 415 = .077
+
+## Conditional probability
+
+The probability of owning a gun *conditional* on trusting others:
+
+\$\$
+P(\\text{OG} \| \\text{TO}) = \\frac{P(OG \\cap TO)}{P(TO)}
+\$\$
+
+In other words, this is the joint probability of owning a gun and trusting others divided by the marginal probability of trusting others.
+
+.077 / .2 = .385
