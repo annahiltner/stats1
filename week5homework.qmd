@@ -1,0 +1,267 @@
+---
+title: "Week 5 Homework"
+author: "Anna Hiltner Nouzeilles"
+format: 
+  html:
+    embed-resources: true
+editor: visual
+---
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+library(ggplot2)
+library(dplyr)
+library(haven)
+library(gssr)
+library(tidyverse)
+
+theme_set(theme_light())
+
+gss2022 <- gss_get_yr(year = 2022) |> 
+  haven::zap_labels() 
+
+```
+
+# Age
+
+```{r}
+#| echo: false
+#| warning: false
+#| fig-align: center
+
+g <- gss2022 |>
+  select(age) |>   
+  drop_na()
+
+ggplot(g, 
+       aes(x = age, y = after_stat(count * 100 / nrow(g)))) +
+  geom_bar(fill = "pink", color = "white") +
+  scale_x_continuous(breaks = seq(0, 100, by = 10)) +
+  labs(title = "GSS 2022 Age Distribution", 
+       x = "Age", 
+       caption = "Source: 2022 General Social Survey",
+       y = "% of Sample") 
+
+mean(g$age)
+```
+The mean of age is $\bar{x}$ = **`r round(mean(g$age, na.rm = TRUE), 2)`**. This means that, on average, individuals in this sample were **`r round(mean(g$age, na.rm = TRUE), 2)`** years old. The standard deviation of age is **`r round(sd(g$age), 2)`**
+
+## Standard Error of Age
+SD = **`r round(sd(g$age), 2)`**
+n = **`r nrow(g)`**
+
+$$
+  \text{SE} = \frac{\text{SD}}{\sqrt{n}}
+  $$
+Therefore,
+$$ 
+\frac{\text{17.75}}{\sqrt{3893}} = .28
+$$
+
+## Confidence Intervals
+
+$$
+CI = \bar{x} \pm z^* \times SE
+$$
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+age_89low <- mean(g$age) - (1.598 * .28)
+age_89high <- mean(g$age) + (1.598 * .28)
+
+age_95low <- mean(g$age) - (1.96 * .28)
+age_95high <- mean(g$age) + (1.96 * .28)
+
+age_99low <- mean(g$age) - (2.576 * .28)
+age_99high <- mean(g$age) + (2.576 * .28)
+
+print(paste("89% CI: [", round(age_89low, 2), ",", round(age_89high, 2), "]"))
+print(paste("95% CI: [", round(age_95low, 2), ",", round(age_95high, 2), "]"))
+print(paste("99% CI: [", round(age_99low, 2), ",", round(age_99high, 2), "]"))
+``` 
+### 89% Confidence Interval
+If we did the same sample infinite times, 89% of those samples would produce a confidence interval that contains the true mean age. 
+
+### 95% Confidence Interval
+If we did the same sample infinite times, 95% of those samples would produce a confidence interval that contains the true mean age.
+
+### 99% Confidence Interval
+If we did the same sample infinite times, 99% of those samples would produce a confidence interval that contains the true mean age.
+
+## Simulations
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+age_simulation100 <- tibble(
+  sim_id = 1:100) |> 
+  rowwise() |> 
+  mutate(age_sample_mean = mean(rnorm(3893, 48, 17.7)))
+
+age_simulation500 <- tibble(
+  sim_id = 1:500) |> 
+  rowwise() |> 
+  mutate(age_sample_mean = mean(rnorm(3893, 48, 17.7)))
+
+age_simulation5000 <- tibble(
+  sim_id = 1:5000) |> 
+  rowwise() |> 
+  mutate(age_sample_mean = mean(rnorm(3893, 48, 17.7)))
+
+se_age_simulation100 <- sd(age_simulation100$age_sample_mean)
+se_age_simulation500 <- sd(age_simulation500$age_sample_mean)
+se_age_simulation5000 <- sd(age_simulation5000$age_sample_mean)
+
+cat("SE of Age Simulation 100:", se_age_simulation100, "\n")
+cat("SE of Age Simulation 500:", se_age_simulation500, "\n")
+cat("SE of Age Simulation 5000:", se_age_simulation5000, "\n")
+
+```
+The more samples I take, the more the standard deviation of the sample means approaches or clusters more tightly around the standard error. This is because of the Law of Large Numbers, which states that as the sample size increases, the sample mean approaches the true population mean.
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+ggplot(age_simulation5000,
+       aes(x = age_sample_mean)) +
+  geom_density(fill = "orange", color = "white") +
+  geom_vline(xintercept = quantile(age_simulation5000$age_sample_mean, 
+                                   c(.025, .25, .75, .975)),
+             color = "darkgreen") +
+  scale_x_continuous(breaks = seq(.50, .70, .01))
+  
+```
+
+# Sex
+
+```{r}
+#| echo: false
+#| warning: false
+#| fig-align: center
+
+f <- gss2022 |>
+  select(sex) |>   
+  drop_na() |>
+  mutate(
+    sex_label = factor(sex, levels = c(1, 2), 
+                       labels = c("Male", "Female"))
+  )
+
+ggplot(f, 
+       aes(x = sex_label, y = after_stat(count * 100 / nrow(f)))) +
+  geom_bar(fill = "lightblue", color = "white") +
+  labs(title = "GSS 2022 Sex Distribution", 
+       x = "Sex", 
+       caption = "Source: 2022 General Social Survey",
+       y = "% of Sample") 
+```
+
+## Mean, Standard Deviation, and Standard Error of Sex
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+f <- gss2022 |> 
+  select(sex) |> 
+  drop_na() |>   
+  mutate(sex = case_match(sex,
+                            1 ~ 1,
+                            2 ~ 0 )) 
+```
+The mean of sample sex is $\bar{x}$ = **`r round(mean(f$sex, na.rm = TRUE), 2)`**. The standard deviation of sex is **`r round(sd(f$sex), 2)`**
+
+SD = **`r round(sd(f$sex), 2)`**
+n = **`r nrow(f)`**
+$$ 
+\frac{\text{.5}}{\sqrt{4126}} = .008
+$$
+
+## Confidence Intervals
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+sex_89low <- mean(f$sex) - (1.598 * .008)
+sex_89high <- mean(f$sex) + (1.598 * .008)
+
+sex_95low <- mean(f$sex) - (1.96 * .008)
+sex_95high <- mean(f$sex) + (1.96 * .008)
+
+sex_99low <- mean(f$sex) - (2.576 * .008)
+sex_99high <- mean(f$sex) + (2.576 * .008)
+
+print(paste("89% CI: [", round(sex_89low, 2), ",", round(sex_89high, 2), "]"))
+print(paste("95% CI: [", round(sex_95low, 2), ",", round(sex_95high, 2), "]"))
+print(paste("99% CI: [", round(sex_99low, 2), ",", round(sex_99high, 2), "]"))
+``` 
+### 89% Confidence Interval
+If we did the same sample infinite times, 89% of those samples would produce a confidence interval that contains the true sex proportion. 
+
+### 95% Confidence Interval
+If we did the same sample infinite times, 95% of those samples would produce a confidence interval that contains the true sex proportion.
+
+### 99% Confidence Interval
+If we did the same sample infinite times, 99% of those samples would produce a confidence interval that contains the true sex proportion.
+
+## Simulations
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+set.seed(722)
+sex_simulation100 <- tibble(
+  sim_id = 1:100) |> 
+  rowwise() |> 
+  mutate(sex_sample_proportion = mean(rbinom(4126, 1, .5)))
+
+sex_simulation500 <- tibble(
+  sim_id = 1:500) |> 
+  rowwise() |> 
+  mutate(sex_sample_proportion = mean(rbinom(4126, 1, .5)))
+
+sex_simulation5000 <- tibble(
+  sim_id = 1:5000) |> 
+  rowwise() |> 
+  mutate(sex_sample_proportion = mean(rbinom(4126, 1, .5)))
+
+se_sex_simulation100 <- sd(sex_simulation100$sex_sample_proportion)
+se_sex_simulation500 <- sd(sex_simulation500$sex_sample_proportion)
+se_sex_simulation5000 <- sd(sex_simulation5000$sex_sample_proportion)
+
+cat("SE of Sex Simulation 100:", se_sex_simulation100, "\n")
+cat("SE of Sex Simulation 500:", se_sex_simulation500, "\n")
+cat("SE of Sex Simulation 5000:", se_sex_simulation5000, "\n")
+
+```
+The more samples I take, the more the standard deviation of the sample proportions approaches or clusters more tightly around the standard error. This is because of the Law of Large Numbers, which states that as the sample size increases, the sample proportion approaches the true population proportion.
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+ggplot(sex_simulation5000,
+       aes(x = sex_sample_proportion)) +
+  geom_density(fill = "lightblue", color = "white") +
+  geom_vline(xintercept = quantile(sex_simulation5000$sex_sample_proportion, c(.025, .25, .75, .975)),
+             color = "red") +
+  scale_x_continuous(breaks = seq(.50, .70, .01)) 
+  
+```
+
+
+  
+
