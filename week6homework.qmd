@@ -1,0 +1,282 @@
+---
+title: "Week 6 Homework"
+author: "Anna Hiltner Nouzeilles"
+format: 
+  html:
+    embed-resources: true
+editor: visual
+---
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+library(ggplot2)
+library(dplyr)
+library(haven)
+library(gssr)
+library(tidyverse)
+
+theme_set(theme_light())
+
+gss2022 <- gss_get_yr(year = 2022) |> 
+  haven::zap_labels() 
+```
+
+# Hypothesis Test: GRASS
+
+**Question** : *Do you think the use of marijuana should be made legal or not?*
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+g <- gss2022 |>
+  select(grass) |>
+  drop_na() |>
+  mutate(grass = ifelse(grass == 1, 1, 0))
+
+grass_null <- .7
+
+grass_prop <- mean(g$grass)
+grass_sd <- sd(g$grass)
+grass_n <- nrow(g)
+grass_se <- grass_sd / sqrt(grass_n)
+grass_diff <- grass_prop - grass_null
+grass_zscore <- grass_diff / grass_se
+grass_pvalue <- ((1 - pnorm(0.1239)) * 2)
+
+grass_95low <- mean(g$grass) - (1.96 * .01366)
+grass_95high <- mean(g$grass) + (1.96 * .01366)
+```
+
+I chose a null of **.7**, which assumes that **70%** of the population favors the death penalty
+
+I will use the conventional alpha level of **.05**, which means I am willing to falsely reject the null hypothesis 5% of the time.
+
+The proportion of grass is $\bar{x}$ = **`r round(mean(g$grass, na.rm = TRUE), 2)`**.
+
+The standard deviation of grass is **`r round(sd(g$grass), 2)`**
+
+The standard error of grass is **`r round(grass_sd / sqrt(grass_n), 4)`**
+
+The z-score is **`r round(grass_diff / grass_se, 4)`**
+
+The p-value, or probability of getting an absolute z-score of 0.1239 or greater, is about **`r ((1 - pnorm(0.1239)) * 2)`**
+
+I have a **.9%** probability of getting a sample proportion of at least **.702** if the true population proportion were **.7**. Since the p-value of .9 is higher than alpha level 0.05, we fail to reject the null hypothesis. I can also use the 95% confidence interval for grass of **.675** and **.728** to fail to reject the null hypothesis.
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+ggplot(data.frame(x = c(.63, .77)), aes(x = x)) +
+  stat_function(fun = dnorm, 
+                args = list(mean = grass_null, sd = grass_se), 
+                color = "orange") +
+  stat_function(fun = dnorm, 
+                args = list(mean = grass_null, sd = grass_se), 
+                geom = "area", 
+                xlim = c(.63, .77), 
+                fill = "lightpink", 
+                alpha = 0.6) +
+  geom_vline(xintercept = grass_prop, 
+             linetype = "dashed", 
+             color = "black") +
+  labs(x = "Proportion Favoring Marijuana Legalization", 
+       y = "Density")
+```
+
+# Hypothesis Test: The Death Penalty
+
+**Question** : *Do you favor or oppose the death penalty for persons convicted of murder?*
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+d <- gss2022 |>
+  select(cappun) |>
+  drop_na() |>
+  mutate(cappun = ifelse(cappun == 1, 1, 0))
+
+dp_prop <- mean(d$cappun)
+dp_sd <- sd(d$cappun)
+dp_n <- nrow(d)
+dp_se <- dp_sd / sqrt(dp_n)
+dp_null <- .4
+dp_diff <- dp_prop - dp_null
+dp_zscore <- dp_diff / dp_se
+dp_pvalue <- ((1 - pnorm(28.986)) * 2)
+
+dp_95low <- mean(d$cappun) - (1.96 * .0078)
+dp_95high <- mean(d$cappun) + (1.96 * .0078)
+```
+
+I chose a null of .4, which assumes that 40% of the population favors the death penalty
+
+I will use the conventional alpha level of .05, which means I am willing to falsely reject the null hypothesis 5% of the time.
+
+The proportion of cappun is $\bar{x}$ = **`r round(mean(d$cappun, na.rm = TRUE), 2)`**.
+
+The standard deviation of cappun is **`r round(sd(d$cappun), 2)`**
+
+The standard error of cappun is **`r round(dp_sd / sqrt(dp_n), 4)`**
+
+The z-score is **`r round(dp_diff / dp_se, 4)`**
+
+The p-value, or probability of getting an absolute z-score of 28.9858 or greater, is about **`r ((1 - pnorm(26.14)) * 2)`**
+
+I have an almost **0%** probability of getting a sample proportion of at least **.604** if the true population proportion were **.4**. Since the p-value of 0 is lower than alpha level 0.05, we can reject the null hypothesis. I can also use the 95% confidence interval for cappun of **.589** and **.619** to reject the null hypothesis.
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+ggplot(data.frame(x = c(.35, .65)), aes(x = x)) +
+  stat_function(fun = dnorm, 
+                args = list(mean = dp_null, sd = dp_se), 
+                color = "blue") +
+  stat_function(fun = dnorm, 
+                args = list(mean = dp_null, sd = dp_se), 
+                geom = "area", 
+                xlim = c(.35, .65), 
+                fill = "violet", 
+                alpha = 0.6) +
+  geom_vline(xintercept = dp_prop, 
+             linetype = "dashed", 
+             color = "black") +
+  labs(x = "Proportion Favoring Death Penalty", 
+       y = "Density")
+```
+
+# Hypothesis Test: age
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+a <- gss2022 |>
+  select(age) |>
+  drop_na()
+
+age_xbar <- mean(a$age)
+age_sd <- sd(a$age)
+age_n <- nrow(a)
+age_se <- age_sd / sqrt(age_n)
+age_null <- 40
+age_diff <- age_xbar - age_null 
+age_zscore <- age_diff / age_se
+age_pvalue <- ((1 - pnorm(28.986)) * 2)
+
+age_95low <- mean(a$age) - (1.96 * .28)
+age_95high <- mean(a$age) + (1.96 * .28)
+```
+
+A reasonable null for this question would be **40 years old.**
+
+I will use the conventional alpha level of **.05**, which means I am willing to falsely reject the null hypothesis 5% of the time.
+
+The mean of age is $\bar{x}$ = **`r round(mean(g$age, na.rm = TRUE), 2)`**. This means that, on average, individuals in this sample were moderate.
+
+The standard deviation of age is **`r round(sd(a$age), 2)`**
+
+The standard error of age is **`r round(age_sd / sqrt(age_n), 4)`**
+
+The z-score is **`r round(age_diff / age_se, 4)`**
+
+The p-value, or probability of getting an absolute z-score of 28.9858 or greater, is about **`r ((1 - pnorm(28.9858)) * 2)`**
+
+I have an almost **0%** probability of getting a sample mean of at least **48.244** if the true population mean were **40**. Since the p-value of 0 is lower than alpha level 0.05, we can reject the null hypothesis. I can also use the 95% confidence interval for age of **47.696** and **48.793** to reject the null hypothesis.
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+ggplot(data.frame(x = c(38, 50)), aes(x = x)) +
+  stat_function(fun = dnorm, 
+                args = list(mean = 40, sd = 0.2844), 
+                color = "#CC0000") +
+  stat_function(fun = dnorm, 
+                args = list(mean = 40, sd = 0.2844), 
+                geom = "area", 
+                xlim = c(39, 41), 
+                fill = "lightblue", 
+                alpha = 0.6) +
+  geom_vline(xintercept = 48.2445, 
+             linetype = "dashed", 
+             color = "black") +
+  labs(x = "Mean Age", 
+       y = "Density")
+```
+
+# Hypothesis Test: Hours Worked
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+h <- gss2022 |>
+  select(hrs1) |>
+  drop_na()
+
+hrs1_xbar <- mean(h$hrs1)
+hrs1_sd <- sd(h$hrs1)
+hrs1_n <- nrow(h)
+hrs1_se <- hrs1_sd / sqrt(hrs1_n)
+hrs1_null <- 40
+hrs1_diff <- hrs1_xbar - hrs1_null 
+hrs1_zscore <- hrs1_diff / hrs1_se
+hrs1_pvalue <- ((1 - pnorm(0.20916)) * 2)
+
+hrs1_95low <- mean(h$hrs1) - (1.96 * .29)
+hrs1_95high <- mean(h$hrs1) + (1.96 * .29)
+```
+
+A reasonable null for this question would be **40 hours** worked per week.
+
+I will use the conventional alpha level of **.06**, which means I am willing to falsely reject the null hypothesis 6% of the time.
+
+The mean of hrs1 is $\bar{x}$ = **`r round(mean(h$hrs1, na.rm = TRUE), 2)`**.
+
+The standard deviation of hours worked is **`r round(sd(h$hrs1), 2)`**
+
+The standard error of hours worked is **`r round(hrs1_sd / sqrt(hrs1_n), 4)`**
+
+The z-score is **`r round(hrs1_diff / hrs1_se, 4)`**
+
+The p-value, or probability of getting an absolute z-score of .21 or greater, is about **`r ((1 - pnorm(.20916488)) * 2)`**
+
+I have a **8%** probability of getting a sample mean of at least **39.94** if the true population mean were **40**. Since the p-value of 8 is higher than alpha level 0.06, we fail to reject the null hypothesis. I can also use the 95% confidence interval for age of **39.37** and **40.51** to fail to reject the null hypothesis.
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+ggplot(data.frame(x = c(39, 41)), aes(x = x)) +
+  stat_function(fun = dnorm, 
+                args = list(mean = hrs1_null, sd = hrs1_se), 
+                color = "darkgreen") +
+  stat_function(fun = dnorm, 
+                args = list(mean = hrs1_null, sd = hrs1_se), 
+                geom = "area", 
+                xlim = c(39, 41), 
+                fill = "lightblue", 
+                alpha = 0.6) +
+  geom_vline(xintercept = hrs1_xbar, 
+             linetype = "dashed", 
+             color = "black") +
+  labs(x = "Mean Hours Worked", 
+       y = "Density")
+```
+
+
