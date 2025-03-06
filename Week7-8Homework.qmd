@@ -1,0 +1,425 @@
+---
+title: "Week 7 and 8 Homework"
+author: "Anna Hiltner Nouzeilles"
+format: 
+  html:
+    embed-resources: true
+editor: visual
+---
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+library(ggplot2)
+library(dplyr)
+library(haven)
+library(gssr)
+library(tidyverse)
+
+theme_set(theme_light())
+
+gss2022 <- gss_get_yr(year = 2022) |> 
+  haven::zap_labels() 
+```
+
+# Comparison #1: Age and TV Hours
+
+Here we can see the difference in mean hours of TV watched between respondents above and below the age of 50:
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+tvage <- gss2022 |> 
+  select(tvhours, age) |> 
+  drop_na() |> 
+  mutate(agecat = if_else(age > 49, "older", "younger"))
+
+tvage |> 
+  summarize(tvhoursm = mean(tvhours), .by = agecat) |> 
+  ggplot(
+    aes(x = agecat,
+        y = tvhoursm)) +
+  geom_col(fill = "purple") +
+  ylim(0, 5) +
+  labs(title = "Hours Watching TV by Age Group",
+       x = "Age group (older = 50+)",
+       y = "Mean TV Hours Watched")
+```
+
+And in a density plot:
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+tvage |> 
+  ggplot(
+    aes(x = tvhours,
+        fill = agecat)) +
+  geom_density(alpha = .5,
+               color = NA)
+
+```
+
+## Hypothesis Test: Age and TV Hours
+
+We can then conduct a hypothesis test using this formula and alpha level 0.05:
+
+$$
+H_0: \mu_{\tiny{older}} - \mu_{\tiny{younger}} = 0 \\ H_1: \mu_{\tiny{older}} - \mu_{\tiny{younger}} \neq 0
+$$
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+a <- gss2022 |>
+  select(age) |>
+  drop_na()
+
+age_xbar <- mean(a$age)
+age_sd <- sd(a$age)
+age_n <- nrow(a)
+age_se <- age_sd / sqrt(age_n)
+age_null <- 40
+age_diff <- age_xbar - age_null 
+age_zscore <- age_diff / age_se
+age_pvalue <- ((1 - pnorm(28.986)) * 2)
+
+age_95low <- mean(a$age) - (1.96 * .28)
+age_95high <- mean(a$age) + (1.96 * .28)
+```
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+tvage_m1 <- mean(tvage$tvhours[tvage$agecat=="older"])
+tvage_m2 <- mean(tvage$tvhours[tvage$agecat=="younger"])
+tvage_s1 <- sd(tvage$tvhours[tvage$agecat=="older"])
+tvage_s2 <- sd(tvage$tvhours[tvage$agecat=="younger"])
+tvage_n1 <- length(tvage$tvhours[tvage$agecat=="older"])
+tvage_n2 <- length(tvage$tvhours[tvage$agecat=="younger"])
+
+tvage_zstat <- (tvage_m1-tvage_m2) / sqrt((tvage_s1^2/tvage_n1) + (tvage_s2^2/tvage_n2))
+
+tvage_pval <- (1 - pnorm(abs(tvage_zstat))) * 2    # two-sided p-value
+```
+
+The z-statistic for tvhours and age is 11.2 and the p-value is almost 0. Since the p-value of 0 is lower than alpha level 0.05, we can reject the null hypothesis. I can also use the 95% confidence interval of \[1.25, 1.79\] to reject the null hypothesis.
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+tvage_obsdiff <- tvage_m1-tvage_m2
+tvage_sediff <- sqrt((tvage_s1^2/tvage_n1) + (tvage_s2^2/tvage_n2))
+
+tvage_lower <- tvage_obsdiff - 1.96 * tvage_sediff
+tvage_upper <- tvage_obsdiff + 1.96 * tvage_sediff
+```
+
+## Cohen's D and Probability of Superiority
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+library(effectsize)
+cohens_d(tvhours ~ agecat, data = tvage)
+
+p_superiority(tvhours ~ agecat, 
+                     data = tvage)
+
+tvage_ps1 <- p_superiority(tvhours ~ agecat,
+                     data = tvage,
+                     parametric = TRUE)
+
+tvage_ps2 <- p_superiority(tvhours ~ agecat,
+                     data = tvage,
+                     parametric = FALSE)
+
+tvage_cohend <- (tvage_m1-tvage_m2) / sqrt((tvage_s1^2 + tvage_s2^2) / 2) #alternative formula to check
+
+```
+
+Cohen's d for tvage is `r round((tvage_m1-tvage_m2) / sd(tvage$tvhours), 2)`. The probability of superiority for tvage is `r round(tvage_ps1$p_superiority, 2)` if we use a normal approximation. The probability of superiority is also `r round (tvage_ps2$p_superiority, 2)` if we calculate it directly from the data.
+
+## Power Analysis
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+library(pwr)
+
+tvage_result <- power.t.test(sig.level = 0.05,
+                              n = nrow(tvage)/2,
+                              power = .8,
+                              delta = NULL)
+
+```
+
+To know how small of an effect size I could detect 80% of the time using these group sizes and an alpha level of 0.05, I conducted a power analysis and find an effect size as small as `r round(tvage_result$delta, 4)` .
+
+### Imaginary Experiment
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+imaginaryexperiment_result <- pwr.2p.test(sig.level = 0.05,
+                                           h = .2,
+                                           n = NULL,
+                                           power = .9)
+
+```
+
+To estimate the sample size I would need for an imaginary experiment, I've picked an effect size of .2, an alpha level of 0.05, and a power level of .9. The imaginary experiment tests whether a new voter registration system increases voter turnout. Since small changes in voter turnout can be politically meaningful, I use a higher power and smaller effect size. With these values, I would need a sample size of `r round(imaginaryexperiment_result$n, 2)` .
+
+# Comparison #2: College Education and Weight
+
+Here we compare weight between individuals with and without a bachelors degree. As you can see, there does not seem to be a large difference:
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+eduweight <- gss2022 |> 
+  select(weight, educ) |> 
+  drop_na() |> 
+  mutate(educat = if_else(educ <= 16, "<BA", "BA+"))
+
+eduweight |> 
+  summarize(weightm = mean(weight), .by = educat) |> 
+  ggplot(
+    aes(x = educat,
+        y = weightm)) +
+  geom_col(fill = "orange") +
+  ylim(0, 200) +
+  labs(title = "Mean Weight by Education",
+       x = "Education Level",
+       y = "Mean Weight")
+```
+
+The density plot:
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+eduweight |> 
+  ggplot(
+    aes(x = weight,
+        fill = educat)) +
+  geom_density(alpha = .5,
+               color = NA) +
+  xlim(0, 500)
+```
+
+## Hypothesis Test for College Education and Weight
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+eduweight_m1 <- mean(eduweight$weight[eduweight$educat=="BA+"])
+eduweight_m2 <- mean(eduweight$weight[eduweight$educat=="<BA"])
+eduweight_s1 <- sd(eduweight$weight[eduweight$educat=="BA+"])
+eduweight_s2 <- sd(eduweight$weight[eduweight$educat=="<BA"])
+eduweight_n1 <- length(eduweight$weight[eduweight$educat=="BA+"])
+eduweight_n2 <- length(eduweight$weight[eduweight$educat=="<BA"])
+
+eduweight_zstat <- (eduweight_m1-eduweight_m2) / sqrt((eduweight_s1^2/eduweight_n1) + (eduweight_s2^2/eduweight_n2))
+eduweight_pval <- (1 - pnorm(abs(eduweight_zstat))) * 2 
+
+```
+
+The z-statistic for Education and Weight is -1.33 and the p-value is .18. Since the p-value of 0.18 is higher than alpha level 0.05, we fail to reject the null hypothesis. I can also use the 95% confidence interval of \[-8.2, 1.55\] to fail to reject the null hypothesis.
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+eduweight_obsdiff <- eduweight_m1-eduweight_m2
+eduweight_sediff <- sqrt((eduweight_s1^2/eduweight_n1) + (eduweight_s2^2/eduweight_n2))
+
+eduweight_lower <- eduweight_obsdiff - 1.96 * eduweight_sediff
+eduweight_upper <- eduweight_obsdiff + 1.96 * eduweight_sediff
+```
+
+## Cohen's D and Probability of Superiority
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+p_superiority(weight ~ educat, 
+                     data = eduweight)
+
+cohens_d(weight ~ educat, 
+                     data = eduweight)
+
+eduweight_cohend <- (eduweight_m1-eduweight_m2) / sqrt((eduweight_s1^2 + eduweight_s2^2) / 2) # to double check
+
+eduweight_ps1 <- p_superiority(weight ~ educat,
+                     data = eduweight,
+                     parametric = TRUE) 
+
+eduweight_ps2 <- p_superiority(weight ~ educat,
+                     data = eduweight,
+                     parametric = FALSE) 
+
+```
+
+Cohen's d for eduweight is `r round(abs(eduweight_m1-eduweight_m2) / sd(eduweight$weight), 2)`. The probability of superiority for eduweight is `r round(eduweight_ps1$p_superiority, 2)` if we use a normal approximation. The probability of superiority is `r round (eduweight_ps2$p_superiority, 2)` if we calculate it directly from the data.
+
+# Comparison #3: Marijuana Legalization and Sex
+
+Here we can see support for marijuana legalization by sex:
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+sgrass <- gss2022 |> 
+  select(grass, sex) |> 
+  drop_na() |> 
+  mutate(
+    grass = ifelse(grass == 1, 1, 0),
+    sex = factor(sex, levels = c(1, 2), labels = c("Male", "Female")) 
+  )
+
+sgrass_summary <- sgrass |> 
+  summarize(grassp = mean(grass), .by = sex) 
+  
+ggplot(sgrass_summary,
+    aes(x = sex,
+        y = grassp)) +
+  geom_col(fill = "darkgreen") +
+  ylim(0, 1) +
+  labs(title = "Support for Marijuana Legalization by Sex",
+       x = "Sex",
+       y = "Proportion Supporting Marijuana Legalization")
+```
+
+## Hypothesis Test: Marijuana Legalization and Sex
+
+We will conduct a hypothesis test on these two variables using the following formula:
+
+$$
+H_0: p_{\tiny{BA+}} - p_{\tiny{<BA}} = 0 \\ H_1: p_{\tiny{BA+}} - p_{\tiny{<BA}} \neq 0
+$$
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+sgrass_n1 <- sgrass |> filter(sex == "Male") |> nrow()
+sgrass_n2 <- sgrass |> filter(sex == "Female") |> nrow()
+sgrass_p1 <- mean(sgrass$grass[sgrass$sex=="Male"], na.rm = TRUE)
+sgrass_p2 <- mean(sgrass$grass[sgrass$sex=="Female"], na.rm = TRUE)
+sgrass_s1 <- sd(sgrass$grass[sgrass$sex == "Male"], na.rm = TRUE)
+sgrass_s2 <- sd(sgrass$grass[sgrass$sex == "Female"], na.rm = TRUE)
+
+sgrass_prop <- (sgrass_p1 * sgrass_n1 + sgrass_p2 * sgrass_n2) / (sgrass_n1 + sgrass_n2)
+
+sgrass_zstat <-
+  (sgrass_p1 - sgrass_p2) / 
+  sqrt(sgrass_prop * (1 - sgrass_prop) * (1 / sgrass_n1 + 1 / sgrass_n2))
+
+sgrass_pvalue <- 2 * (1 - pnorm(abs(sgrass_zstat)))
+
+sgrass_obsdiff <- sgrass_p1-sgrass_p2
+sgrass_sediff <- sqrt((sgrass_s1^2/sgrass_n1) + (sgrass_s2^2/sgrass_n2))
+
+sgrass_lower <- sgrass_obsdiff - 1.96 * sgrass_sediff
+sgrass_upper <- sgrass_obsdiff + 1.96 * sgrass_sediff
+
+```
+
+The z-statistic for comparing marijuana legalization and sex is 1.32 and the p-value is .19. Since the p-value is higher than alpha level 0.05, we fail to reject the null hypothesis. I can also use the 95% confidence interval of \[-0.017, 0.09\] to fail to reject the null hypothesis.
+
+# Comparison #4: Death Penalty and Sex
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+scappun <- gss2022 |> 
+  select(cappun, sex) |> 
+  drop_na() |> 
+  mutate(
+    cappun = if_else(cappun == 1, 1, 0),
+    sex = if_else(sex == 1, 1, 0),
+    sex = factor(sex, levels = c(1, 0), labels = c("Male", "Female")))
+
+scappun_summary <- scappun |> 
+  summarize(cappunp = mean(cappun), .by = sex) 
+  
+ggplot(scappun_summary,
+    aes(x = sex,
+        y = cappunp)) +
+  geom_col(fill = "darkblue") +
+  ylim(0, 1) +
+  labs(title = "Support for Death Penalty by Sex",
+       x = "Sex",
+       y = "Proportion Supporting Death Penalty")
+```
+
+## Hypothesis Test: Death Penalty and Sex
+
+$$
+Z=\dfrac{(\hat{p}_1-\hat{p}_2)}{\sqrt{\hat{p}(1-\hat{p})\left(\dfrac{1}{n_1}+\dfrac{1}{n_2}\right)}}
+$$
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+scappun_n1 <- scappun |> filter(sex == "Male") |> nrow()
+scappun_n2 <- scappun |> filter(sex == "Female") |> nrow()
+
+scappun_p1 <- mean(scappun$cappun[scappun$sex=="Male"])
+scappun_p2 <- mean(scappun$cappun[scappun$sex=="Female"])
+
+scappun_prop <- (scappun_p1 * scappun_n1 + scappun_p2 * scappun_n2) / (scappun_n1 + scappun_n2)
+
+scappun_zstat <-
+  (scappun_p1 - scappun_p2) / 
+  sqrt(scappun_prop * (1 - scappun_prop) * (1 / scappun_n1 + 1 / scappun_n2))
+
+scappun_pvalue <- 2 * (1 - pnorm(abs(scappun_zstat)))
+
+scappun_s1 <- sd(scappun$cappun[scappun$sex == "Male"], na.rm = TRUE)
+scappun_s2 <- sd(scappun$cappun[scappun$sex == "Female"], na.rm = TRUE)
+
+scappun_obsdiff <- scappun_p1-scappun_p2
+scappun_sediff <- sqrt((scappun_s1^2/scappun_n1) + (scappun_s2^2/scappun_n2))
+
+scappun_lower <- scappun_obsdiff - 1.96 * scappun_sediff
+scappun_upper <- scappun_obsdiff + 1.96 * scappun_sediff
+
+```
+
+The z-statistic for comparing the Death Penalty and Sex is 5.921 and the p-value is almost zero. Since the p-value is lower than alpha level 0.05, we can reject the null hypothesis. I can also use the 95% confidence interval of \[0.06, 0.123\] to reject the null hypothesis.
