@@ -1,0 +1,196 @@
+---
+title: "Week 9 Homework"
+author: "Anna Hiltner Nouzeilles"
+format: 
+  html:
+    embed-resources: true
+editor: visual
+---
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+library(gssr)
+library(tidyverse)
+
+theme_set(theme_light())
+
+gss2022 <- gss_get_yr(year = 2022) |> 
+  haven::zap_labels() 
+```
+
+# Marijuana Legalization and Sex
+
+**Outcome:** Marijuana Legalization (Support/Oppose)
+
+**Predictor:** Sex (Male/Female)
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+sgrass <- gss2022 |> 
+  select(grass, sex) |> 
+  drop_na() |> 
+  mutate(
+    grass_support = ifelse(grass == 1, 1, 0),
+    sex = if_else(sex == 1, 1, 0)
+    ) |>
+  select(grass_support, sex)
+
+sgrass_table <- table(sgrass$sex, sgrass$grass_support)
+
+dimnames(sgrass_table) <- list(
+  "Sex" = c("Female", "Male"),  
+  "Support Legalization" = c("Oppose", "Support") 
+)
+
+print(sgrass_table)
+```
+
+## Difference in Probability Regression
+
+```{r}
+mod1_sgrass <- lm(grass_support ~ sex,
+            data = sgrass)
+
+summary(mod1_sgrass)
+```
+
+### Interpretation
+
+According to the difference in probabilities regression, males are 3.61 percentage points more likely to support marijuana legalization than females. However, the p-value of .188 is above alpha 0.05 which means we fail to reject the null hypothesis.
+
+## Risk Ratio Regression
+
+```{r}
+mod2_sgrass <- glm(grass_support ~ sex,
+            data = sgrass,
+            family = binomial(link = "log"))
+
+summary(mod2_sgrass)
+
+exp(0.05139)
+```
+
+### Interpretation
+
+The Risk Ratio is 1.0527 which means that males are 5.3% more likely to support marijuana legalization compared to females. However, the p-value of 0.186 is higher than our alpha of 0.05 which means we fail to reject the null hypothesis. The risk ratio is higher than the difference in probabilities because the difference in probabilities measures absolute changes in probability while the risk ratio measures relative differences in probability. Here, a smaller absolute difference appears as a larger relative difference.
+
+## Confidence Intervals
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+sgrass_p1 <- mean(sgrass$grass_support[sgrass$sex==1], na.rm = TRUE)
+sgrass_p2 <- mean(sgrass$grass_support[sgrass$sex==0], na.rm = TRUE)
+
+sgrass_s1 <- sd(sgrass$grass_support[sgrass$sex == 1], na.rm = TRUE)
+sgrass_s2 <- sd(sgrass$grass_support[sgrass$sex == 0], na.rm = TRUE)
+
+sgrass_n1 <- sgrass |> filter(sex == 1) |> nrow()
+sgrass_n2 <- sgrass |> filter(sex == 0) |> nrow()
+
+sgrass_prop <- (sgrass_p1 * sgrass_n1 + sgrass_p2 * sgrass_n2) / (sgrass_n1 + sgrass_n2)
+
+sgrass_obsdiff <- sgrass_p1-sgrass_p2
+sgrass_sediff <- sqrt((sgrass_s1^2/sgrass_n1) + (sgrass_s2^2/sgrass_n2))
+
+sgrass_lower <- sgrass_obsdiff - 1.96 * sgrass_sediff
+sgrass_upper <- sgrass_obsdiff + 1.96 * sgrass_sediff
+```
+
+With a 95% confidence interval of \[-0.017, 0.09\] and p-value of .19, we fail to reject the null hypothesis.
+
+---
+
+# Death Penalty and Sex
+
+**Outcome:** Death Penalty (Support/Oppose)
+
+**Predictor:** Sex (Male/Female)
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+scappun <- gss2022 |> 
+  select(cappun, sex) |> 
+  drop_na() |> 
+  mutate(
+    cappun = if_else(cappun == 1, 1, 0),
+    sex = if_else(sex == 1, 1, 0)
+  ) |>
+  select(cappun, sex)
+
+scappun_table <- table(scappun$sex, scappun$cappun)
+
+dimnames(scappun_table) <- list(
+  "Sex" = c("Female", "Male"),  
+  "Death Penalty" = c("Oppose", "Support") 
+)
+
+print(scappun_table)
+```
+
+## Difference in Probability Regression
+
+```{r}
+mod1_scappun <- lm(cappun ~ sex,
+            data = scappun)
+
+summary(mod1_scappun)
+```
+
+### Interpretation 
+
+According to the difference in probabilities regression, males are 9.3 percentage points more likely to support the death penalty than females.
+
+## Risk Ratio Regression
+
+```{r}
+mod2_scappun <- glm(cappun ~ sex,
+            data = scappun,
+            family = binomial(link = "log"))
+
+summary(mod2_scappun)
+
+exp(0.05290)
+```
+
+### Interpretation
+
+The Risk Ratio is 1.0543 which means that males are 5.4% more likely to support the death penalty compared to females. The p-value is lower than our alpha of 0.05 which means we can reject the null hypothesis. The risk ratio is smaller than the difference in probabilities because the difference in probabilities regression measures absolute differences in probability while the risk ratio measures relative differences and scales proportionally.
+
+## Confidence Intervals
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+scappun_p1 <- mean(scappun$cappun[scappun$sex==1])
+scappun_p2 <- mean(scappun$cappun[scappun$sex==0])
+
+scappun_s1 <- sd(scappun$cappun[scappun$sex == 1], na.rm = TRUE)
+scappun_s2 <- sd(scappun$cappun[scappun$sex == 0], na.rm = TRUE)
+
+scappun_n1 <- scappun |> filter(sex == 1) |> nrow()
+scappun_n2 <- scappun |> filter(sex == 0) |> nrow()
+
+scappun_prop <- (scappun_p1 * scappun_n1 + scappun_p2 * scappun_n2) / (scappun_n1 + scappun_n2)
+
+scappun_obsdiff <- scappun_p1-scappun_p2
+scappun_sediff <- sqrt((scappun_s1^2/scappun_n1) + (scappun_s2^2/scappun_n2))
+
+scappun_lower <- scappun_obsdiff - 1.96 * scappun_sediff
+scappun_upper <- scappun_obsdiff + 1.96 * scappun_sediff
+```
+
+With a 95% confidence interval of \[0.06, 0.123\] and p-value of almost zero, we can reject the null hypothesis.
