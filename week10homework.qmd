@@ -1,0 +1,538 @@
+---
+title: "Week 10 Homework"
+author: "Anna Hiltner Nouzeilles"
+format: 
+  html:
+    embed-resources: true
+editor: visual
+---
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+library(gssr)
+library(tidyverse)
+
+theme_set(theme_light())
+
+gss2022 <- gss_get_yr(year = 2022) |> 
+  haven::zap_labels() 
+```
+
+# Marijuana Legalization and Sex
+
+## Contingency Table
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+sgrass <- gss2022 |>
+  select(grass, sex) |>
+  drop_na() |>
+  mutate(
+    grass = if_else(grass == 1, 1, 0),
+    sex = if_else(sex == 1, 1, 0)
+  ) |>
+  select(grass, sex)
+  
+sgrass_table <- table(sgrass$sex, sgrass$grass)
+
+dimnames(sgrass_table) <- list(
+  "Sex" = c("Female", "Male"),
+  "Support Legalization" = c("Oppose", "Support")
+)
+
+print(sgrass_table)
+
+```
+## Visualization
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+sgrass_bar <- gss2022 |>
+  select(grass, sex) |>
+  drop_na() |>
+  mutate(
+    grass = if_else(grass == 1, 1, 0)
+  ) |>
+  group_by(sex) |>
+  summarize(grass_support = mean(grass))
+
+ggplot(sgrass_bar, aes(x = factor(sex), y = grass_support * 100)) +
+  geom_col(fill = c("darkgreen", "darkblue")) +
+  scale_x_discrete(labels = c("2" = "Female", "1" = "Male")) +
+  labs(
+    title = "Support for Marijuana Legalization by Sex",
+    caption = "Source: 2022 GSS",
+    x = "Sex",
+    y = "% Supporting Legalization",
+  ) 
+```
+
+grass = Outcome Y
+
+sex = Predictor X
+
+X = 1 is male
+
+X = 0 is female
+
+## Difference in Probability Regression
+```{r}
+mytidy <- function(x) {
+  broom::tidy(x) |> 
+    select(term, estimate, std.error)
+}
+
+mod1_sgrass <- lm(grass ~ sex,
+            data = sgrass)
+
+mytidy(mod1_sgrass)
+```
+Males are 3.61 percentage points more likely to support marijuana legalization than females. However, the p-value of .188 is above alpha 0.05 which means we fail to reject the null hypothesis.
+
+## Risk Ratio Regression
+```{r}
+mod2_sgrass <- glm(grass ~ sex,
+            data = sgrass,
+            family = binomial(link = "log"))
+
+mytidy(mod2_sgrass)
+
+exp(0.05139)
+```
+The Risk Ratio is 1.0527. Males are 5.3% more likely to support marijuana legalization compared to females. However, the p-value of 0.186 is higher than our alpha of 0.05 which means we fail to reject the null hypothesis. 
+
+## Log Probability and Risk Ratio
+```{r}
+mod3_sgrass <- glm(grass ~ sex,
+            data = sgrass,
+            family = binomial(link = "log"))
+mytidy(mod3_sgrass)
+```
+
+### Log Probability
+
+$\alpha$ = -0.38
+
+### Log Risk Ratio
+
+$\beta$ = 0.051
+
+## Log Odds
+
+```{r}
+mod4_sgrass <- glm(grass ~ sex,
+            data = sgrass,
+            family = binomial(link = "logit"))
+
+mytidy(mod4_sgrass)
+```
+
+
+$$
+\log\left(\frac{P(grass = 1)}{1 - P(grass = 1)}\right)
+$$
+
+The log odds that grass = 1 when sex = 0 is $\alpha$ = 0.77601
+
+For sex = 1, the log odds that grass = 1 is 0.77601 + 0.17308 = 0.94909
+
+## Log Odds Ratio
+
+$$
+\beta = \log \left[ \frac{P(grass = 1 \mid sex=1)}{1 - P(grass = 1 \mid sex = 1)} \right] - \log \left[ \frac{P(grass = 1 \mid sex=0)}{1 - P(grass = 1 \mid sex=0)} \right]
+$$
+
+$\beta$ = 0.17308
+The exponentiated beta is 1.1889
+
+The odds of supporting marijuana are 1.19 times greater for males than for females.
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+exp(0.17308)
+```
+
+
+# Degree Attainment and Abortion
+
+## Contingency Table
+```{r}
+degree_abany <- gss2022 |> 
+  select(abany, degree) |> 
+  drop_na() |> 
+  mutate(abany = if_else(abany == 1, 1, 0)) |> 
+  mutate(grad = if_else(degree == 4, 1, 0)) |>
+  select(abany, grad) 
+
+degree_abany_table <- table(degree_abany$abany, degree_abany$grad)
+
+dimnames(degree_abany_table) <- list(
+  "Abortion" = c("Oppose", "Support"),
+  "Degree Attainment" = c("Non-Graduate", "Graduate")
+)
+
+print(degree_abany_table)
+```
+## Visualization
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+degree_abany_graph <- gss2022 |> 
+  select(abany, degree) |> 
+  drop_na() |> 
+  mutate(abany = if_else(abany == 1, 1, 0), 
+         grad = if_else(degree == 4, 1, 0)) |> 
+  group_by(grad) |> 
+  summarize(abortion_support = mean(abany)) 
+
+ggplot(degree_abany_graph, aes(x = factor(grad), y = abortion_support * 100)) +
+  geom_col(fill = c("#ff7261", "#057f8d")) +
+  scale_x_discrete(labels = c("0" = "No Graduate Degree", "1" = "Graduate Degree")) +
+  labs(
+    title = "Support for Abortion by Degree Attainment",
+    x = "Degree Attainment",
+    y = "% Supporting Abortion",
+    caption = "Source: 2022 GSS"
+  )
+
+```
+
+## Difference in Probability Regression
+```{r}
+
+mod1_degree_abany <- lm(abany ~ grad,
+            data = degree_abany)
+
+mytidy(mod1_degree_abany)
+```
+Grads are 13.4% percentage points more likely to support abortion than non-graduates. 
+
+## Risk Ratio Regression
+```{r}
+mod2_degree_abany <- glm(abany ~ grad,
+            data = degree_abany,
+            family = binomial(link = "log"))
+
+mytidy(mod2_degree_abany)
+
+exp(0.210283)
+```
+The Risk Ratio is 1.234. Those with a grad degree are are 23% more likely to support abortion compared to those without a grad degree. 
+
+## Log Probability and Risk Ratio
+```{r}
+mod3_degree_abany <- glm(abany ~ grad,
+            data = degree_abany,
+            family = binomial(link = "log"))
+mytidy(mod3_degree_abany)
+```
+
+### Log Probability
+
+$\alpha$ = -0.555
+
+### Log Risk Ratio
+
+$\beta$ = 0.21
+
+## Log Odds
+
+```{r}
+mod4_degree_abany <- glm(abany ~ grad,
+            data = degree_abany,
+            family = binomial(link = "logit"))
+
+mytidy(mod4_degree_abany)
+
+exp(.59)
+```
+
+
+$$
+\log\left(\frac{P(abany = 1)}{1 - P(abany = 1)}\right)
+$$
+
+The log odds that abany = 1 when grad = 0 is $\alpha$ = .299
+
+For grad = 1, the log odds that abany = 1 is 0.299 + 0.589 = 0.888
+
+## Log Odds Ratio
+
+$$
+\beta = \log \left[ \frac{P(abany = 1 \mid grad=1)}{1 - P(abany = 1 \mid grad = 1)} \right] - \log \left[ \frac{P(abany = 1 \mid grad=0)}{1 - P(abany = 1 \mid grad=0)} \right]
+$$
+
+$\beta$ = 0.59
+The exponentiated beta is 1.8
+
+The odds of supporting abortion are 1.8 times greater for those with a graduate degree than those without one.
+
+# Voted for Biden and Marijuana Legalization
+
+## Contingency Table
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+biden_grass <- gss2022 |> 
+  select(pres20, grass) |>
+  drop_na() |>
+  mutate(biden = if_else(pres20 == 1, 1, 0),
+         grass = if_else(grass == 1, 1, 0)) |>
+  select(biden, grass) 
+
+biden_grass_table <- table(biden_grass$biden, biden_grass$grass)
+
+dimnames(biden_grass_table) <- list(
+  "Biden" = c("No Vote", "Vote"),
+  "Marijuana Legalization" = c("Oppose", "Support")
+)
+
+print(biden_grass_table)
+```
+
+## Visualization
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+biden_grass_bar <- gss2022 |> 
+  select(pres20, grass) |>
+  drop_na() |>
+  mutate(
+    biden = if_else(pres20 == 1, 1, 0),
+    grass = if_else(grass == 1, 1, 0)
+  ) |>
+  group_by(grass) |>
+  summarize(vote_biden = mean(biden))
+
+ggplot(biden_grass_bar, aes(x = factor(grass), y = vote_biden * 100)) +
+  geom_col(fill = c("darkred", "#057f8d")) +
+  scale_x_discrete(labels = c("0" = "Oppose Legalization", "1" = "Support Legalization")) +
+  labs(
+    title = "Support for Biden by Support of Marijuana Legalization",
+    x = "Support of Marijuana Legalization",
+    y = "% Voted for Biden",
+    caption = "Source: 2022 GSS"
+  ) 
+
+```
+
+
+## Difference in Probability Regression
+```{r}
+mod1_biden_grass <- lm(biden ~ grass,
+            data = biden_grass)
+
+mytidy(mod1_biden_grass)
+```
+Marijuana legalization supporters are 29 percentage points more likely to have voted for Biden than those opposed to marijuana legalization. 
+
+## Risk Ratio Regression
+```{r}
+mod2_biden_grass <- glm(biden ~ grass,
+            data = biden_grass,
+            family = binomial(link = "log"))
+
+mytidy(mod2_biden_grass)
+
+exp(0.5932218)
+```
+The Risk Ratio is 1.81. Marijuana legalization supporters are 81% more likely to have voted for Biden than those who oppose marijuana legalization. 
+
+## Log Probability and Risk Ratio
+```{r}
+mod3_biden_grass <- glm(biden ~ grass,
+            data = biden_grass,
+            family = binomial(link = "log"))
+mytidy(mod3_biden_grass)
+```
+
+### Log Probability
+
+$\alpha$ = -1.03
+
+### Log Risk Ratio
+
+$\beta$ = 0.593
+
+## Log Odds
+
+```{r}
+mod4_biden_grass <- glm(biden ~ grass,
+            data = biden_grass,
+            family = binomial(link = "logit"))
+
+mytidy(mod4_biden_grass)
+```
+
+
+$$
+\log\left(\frac{P(biden = 1)}{1 - P(biden = 1)}\right)
+$$
+
+The log odds that sex = 1 when grass = 0 is $\alpha$ = -0.58
+
+For grass = 1, the log odds that sex = 1 is -.582 + 1.2 = 0.618
+
+## Log Odds Ratio
+
+$$
+\beta = \log \left[ \frac{P(sex = 1 \mid grass=1)}{1 - P(sex = 1 \mid grass = 1)} \right] - \log \left[ \frac{P(sex = 1 \mid grass=0)}{1 - P(sex = 1 \mid grass=0)} \right]
+$$
+
+$\beta$ = 1.2
+The exponentiated beta is 3.32
+
+The odds of being a male are 3.32 times greater for marijuana legalization supporters than for those opposed.
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+exp(1.2)
+```
+
+
+# Voted for Biden and Degree Attainment
+
+## Contingency Table
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+biden_grad <- gss2022 |> 
+  select(pres20, degree) |>
+  drop_na() |>
+  mutate(biden = if_else(pres20 == 1, 1, 0),
+         grad = if_else(degree == 4, 1, 0)) |>
+  select(biden, grad) 
+
+biden_grad_table <- table(biden_grad$biden, biden_grad$grad)
+
+dimnames(biden_grad_table) <- list(
+  "Biden" = c("No Vote", "Vote"),
+  "Degree Attainment" = c("Non-Graduate", "Graduate")
+)
+
+print(biden_grad_table)
+```
+
+## Visualization
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+biden_grad_bar <- gss2022 |> 
+  select(pres20, degree) |> 
+  drop_na() |> 
+  mutate(
+    biden = if_else(pres20 == 1, 1, 0),
+    grad = if_else(degree == 4, 1, 0)
+  ) |>
+  group_by(grad) |> 
+  summarize(vote_biden = mean(biden))
+
+ggplot(biden_grad_bar, aes(x = factor(grad), y = vote_biden * 100)) +
+  geom_col(fill = c("orange", "purple")) +
+  scale_x_discrete(labels = c("0" = "No Graduate Degree", "1" = "Graduate Degree")) +
+  labs(
+    title = "Support for Biden by Degree Attainment",
+    x = "Degree Attainment",
+    y = "% Voted for Biden",
+    caption = "Source: 2022 GSS"
+  ) 
+```
+
+## Difference in Probability Regression
+```{r}
+mod1_biden_grad <- lm(biden ~ grad,
+            data = biden_grad)
+
+mytidy(mod1_biden_grad)
+```
+Respondents with a graduate degree are 17.2 percentage points more likely to have voted for Biden than those without a graduate degree.
+
+## Risk Ratio Regression
+```{r}
+mod2_biden_grad <- glm(biden ~ grad,
+            data = biden_grad,
+            family = binomial(link = "log"))
+
+mytidy(mod2_biden_grad)
+
+exp(0.2566021)
+```
+The Risk Ratio is 1.29. Those with a graduate degree are 29.2% more likely to have voted for Biden than those who do not have a graduate degree. 
+
+## Log Probability and Risk Ratio
+```{r}
+mod3_biden_grad <- glm(biden ~ grad,
+            data = biden_grad,
+            family = binomial(link = "log"))
+mytidy(mod3_biden_grad)
+```
+
+### Log Probability
+
+$\alpha$ = -0.53
+
+### Log Risk Ratio
+
+$\beta$ = 0.26
+
+## Log Odds
+
+```{r}
+mod4_biden_grad <- glm(biden ~ grad,
+            data = biden_grad,
+            family = binomial(link = "logit"))
+
+mytidy(mod4_biden_grad)
+```
+
+
+$$
+\log\left(\frac{P(biden = 1)}{1 - P(biden = 1)}\right)
+$$
+
+The log odds that grass = 1 when grad = 0 is $\alpha$ = 0.359
+
+For grad = 1, the log odds that grass = 1 is 0.36 + 0.8 = 1.16
+
+## Log Odds Ratio
+
+$$
+\beta = \log \left[ \frac{P(grass = 1 \mid grad=1)}{1 - P(grass = 1 \mid grad = 1)} \right] - \log \left[ \frac{P(grass = 1 \mid grad=0)}{1 - P(grass = 1 \mid grad=0)} \right]
+$$
+
+$\beta$ = .799
+The exponentiated beta is 2.22
+
+The odds of supporting marijuana legalization are 2.22 times greater for those with a grad degree than those without.
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+exp(.799)
+```
+
