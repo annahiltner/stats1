@@ -1,0 +1,238 @@
+---
+title: "Week 11 Homework"
+author: "Anna Hiltner Nouzeilles"
+format: 
+  html:
+    embed-resources: true
+editor: visual
+---
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+library(gssr)
+library(tidyverse)
+
+theme_set(theme_light())
+
+gss2022 <- gss_get_yr(year = 2022) |> 
+  haven::zap_labels() 
+```
+
+# Gun Control and Sex
+
+## LPM (or Difference in Probability Regression)
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+sgun <- gss2022 |> 
+  select(gunlaw, sex) |> 
+  drop_na() |> 
+  mutate(
+    gunlaw = if_else(gunlaw == 1, 1, 0),
+    sex = if_else(sex == 1, 1, 0)
+  ) |>
+  select(gunlaw, sex)
+
+sgun_table <- table(sgun$sex, sgun$gunlaw)
+
+dimnames(sgun_table) <- list(
+  "Sex" = c("Female", "Male"),  
+  "Gun Control" = c("Oppose", "Support") 
+)
+
+print(sgun_table)
+```
+
+**Outcome:** Gun Control (Support/Oppose)
+
+**Predictor:** Sex (Male/Female)
+
+### First, Manually:
+
+Female probability of support: 1143/1431 = 0.7987
+
+Male probability of support: 816/1265 = 0.6451
+
+0.7987 - 0.6451 = .1536 which means that females are 15.4% more likely to support gun control than males.
+
+### In R:
+
+```{r}
+mytidy <- function(x) {
+  broom::tidy(x) |> 
+    select(term, estimate, std.error)
+}
+
+mod1_sgun <- lm(gunlaw ~ sex,
+            data = sgun)
+
+mytidy(mod1_sgun)
+```
+
+The intercept is the predicted probability of supporting gun control for females. The sex coefficient is the difference in probability between males and females.
+
+Men are 15.4 percentage points less likely to support gun control.
+
+## Risk Ratio
+
+### First, Manually:
+
+Male Probability of Support / Female Probability of Support = .6451 / .7987 = 0.8076
+
+### In R:
+
+```{r}
+mod2_sgun <- glm(gunlaw ~ sex,
+            data = sgun,
+            family = binomial(link = "log"))
+
+mytidy(mod2_sgun)
+
+exp(-.21370)
+```
+
+The risk ratio of .81 means that men are 81% as likely as women to support gun control, or (1-.81=) 19% less likely to support gun control than women.
+
+## Logit
+
+```{r}
+mod3_sgun <- glm(gunlaw ~ sex,
+            data = sgun,
+            family = binomial(link = "logit"))
+
+mytidy(mod3_sgun)
+
+exp(-.7810)
+```
+
+The log odds that females support gun control (gunlaw = 1 when sex = 0) is $\alpha$ = 1.38
+
+The log odds that males support gun control (sex = 1 when gunlaw = 1) is 1.38 - 0.7810 = .599
+
+The odds ratio is exp(-0.781) = 0.4577 which means that the odds of men supporting gun control are 46% of the odds for women.
+
+# Linear Regressions (Gaussian GLMs)
+
+### First Gaussian GLM
+
+```{r}
+sexweight <- gss2022 |>
+  select(weight, sex) |>
+  drop_na() |>
+  mutate(sex = if_else(sex <= 1, 1, 0)) |>
+  select(weight, sex)
+
+mod1_sexweight <- lm(weight ~ sex,
+                     data = sexweight)
+
+mytidy(mod1_sexweight)
+```
+
+The average weight for females is 173 lbs (alpha). Males weigh 24 lbs (beta) more than females. (173 + 24 = 197) The average weight for males is 197 lbs.
+
+### Second Gaussian GLM
+
+```{r}
+sextvhours <- gss2022 |>
+  select(tvhours, sex) |>
+  drop_na() |>
+  mutate(sex = if_else(sex <= 1, 1, 0)) |>
+  select(tvhours, sex)
+
+mod1_sextvhours <- lm(tvhours ~ sex,
+                     data = sextvhours)
+
+mytidy(mod1_sextvhours)
+```
+
+Females watch 3.44 (alpha) hours of TV on average. Males watch .065 (beta) less hours of TV than females, which means they watch 3.375 hours of TV on average.
+
+# Poisson GLM
+
+```{r}
+sexpartners <- gss2022 |>
+  select(partnrs5, sex) |>
+  drop_na() |>
+  mutate(sex = if_else(sex <= 1, 1, 0)) |>
+  select(partnrs5, sex)
+
+mod1_sexpartners <- glm(partnrs5 ~ sex,
+               data = sexpartners,
+               family = poisson(link="log"))
+
+sexpartners_table <- table(sexpartners$sex, sexpartners$partnrs5)
+
+print(sexpartners_table)
+mytidy(mod1_sexpartners)
+
+exp(0.3703)
+exp(0.2155)
+exp(0.59)
+```
+
+Alpha is .37 log partners for women. Exponentiated, we find that women had on average 1.45 partners in the last 5 years.
+
+.37 + .216 = .59 log partners for men. Exponentiated, we find that men had on average 1.8 partners in the last five years.
+
+Beta is 0.216 log partners, which means that men had .216 more log partners than women in the past five years. Exponentiated, there is a ratio of 1.24, which means that men had 24% more partners in the last year than women.
+
+### Manually
+
+```{r}
+#| echo: false
+
+gss2022 |>
+  select(partnrs5, sex) |>
+  drop_na() |>
+  mutate(sex = if_else(sex == 1, "male", "female")) |>
+  summarize(mean_partners = mean(partnrs5), .by = sex) 
+```
+
+$$
+  \log(y_i) = \alpha + \beta x_i
+$$
+
+log(1.45) = .37 for females
+
+log(1.8) = .59 for males
+
+beta = .59 - .37 = .216 = log rate ratio, or the difference in log sex partners between females and males.
+
+exp(.216) = 1.24, which means men have 1.24x, or 24% more sexual partners than women
+
+In LPM style, 1.8 - 1.45 = .35, so males have .35 more siblings than women. Which doesn't make sense, which is why we would not use an identity link model for these variables.
+
+### Second Poisson GLM
+
+```{r}
+sibsdegree <- gss2022 |>
+  select(sibs, degree) |>
+  drop_na() |>
+  mutate(college = if_else(degree <= 3, 1, 0)) |>
+  select(sibs, college)
+
+mod1_sibsdegree <- glm(sibs ~ college,
+               data = sibsdegree,
+               family = poisson(link="log"))
+
+sibsdegree_table <- table(sibsdegree$sibs, sibsdegree$college)
+
+print(sibsdegree_table)
+mytidy(mod1_sibsdegree)
+
+exp(0.9525)
+exp(0.3130)
+exp(0.6395)
+```
+
+Alpha is 0.9525 log siblings for those with a college degree. Exponentiated, we find that those with a college degree have on average 2.59 siblings.
+
+0.9525 - 0.3130 = 0.6395 log siblings for those without a college degree. Exponentiated, we find that those without a college degree have on average 1.89 siblings.
+
+Beta is 0.3130 log siblings, which means those with a college degree have 0.313 more siblings than those without a college degree. Exponentiated, we get a ratio of 1.37, which means that those with a college degree have 37% more siblings than those without a college degree.
