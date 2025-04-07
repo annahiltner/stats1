@@ -35,7 +35,7 @@ sgun <- gss2022 |>
   drop_na() |> 
   mutate(
     gunlaw = if_else(gunlaw == 1, 1, 0),
-    sex = if_else(male == 1, 1, 0)
+    male = if_else(sex == 1, 1, 0)
   ) |>
   select(gunlaw, male)
 
