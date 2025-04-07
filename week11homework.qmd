@@ -35,11 +35,11 @@ sgun <- gss2022 |>
   drop_na() |> 
   mutate(
     gunlaw = if_else(gunlaw == 1, 1, 0),
-    sex = if_else(sex == 1, 1, 0)
+    sex = if_else(male == 1, 1, 0)
   ) |>
-  select(gunlaw, sex)
+  select(gunlaw, male)
 
-sgun_table <- table(sgun$sex, sgun$gunlaw)
+sgun_table <- table(sgun$male, sgun$gunlaw)
 
 dimnames(sgun_table) <- list(
   "Sex" = c("Female", "Male"),  
@@ -55,9 +55,9 @@ print(sgun_table)
 
 ### First, Manually:
 
-Female probability of support: 1143/1431 = 0.7987
+Female conditional probability of support: 1143/1431 = 0.7987
 
-Male probability of support: 816/1265 = 0.6451
+Male conditional probability of support: 816/1265 = 0.6451
 
 0.7987 - 0.6451 = .1536 which means that females are 15.4% more likely to support gun control than males.
 
@@ -69,8 +69,9 @@ mytidy <- function(x) {
     select(term, estimate, std.error)
 }
 
-mod1_sgun <- lm(gunlaw ~ sex,
-            data = sgun)
+mod1_sgun <- lm(gunlaw ~ male,
+            data = sgun,
+            family = binomial(link = "identity"))
 
 mytidy(mod1_sgun)
 ```
@@ -88,7 +89,7 @@ Male Probability of Support / Female Probability of Support = .6451 / .7987 = 0.
 ### In R:
 
 ```{r}
-mod2_sgun <- glm(gunlaw ~ sex,
+mod2_sgun <- glm(gunlaw ~ male,
             data = sgun,
             family = binomial(link = "log"))
 
@@ -102,7 +103,7 @@ The risk ratio of .81 means that men are 81% as likely as women to support gun c
 ## Logit
 
 ```{r}
-mod3_sgun <- glm(gunlaw ~ sex,
+mod3_sgun <- glm(gunlaw ~ male,
             data = sgun,
             family = binomial(link = "logit"))
 
@@ -117,6 +118,23 @@ The log odds that males support gun control (sex = 1 when gunlaw = 1) is 1.38 - 
 
 The odds ratio is exp(-0.781) = 0.4577 which means that the odds of men supporting gun control are 46% of the odds for women.
 
+## Log Likelihood Comparison
+
+```{r}
+#using binomial distribution
+
+sgun <- sgun |>
+  mutate(predprob = 
+           predict(mod1_sgun,
+                   type = "response")) |>
+  mutate(l = dbinom(gunlaw, 1, predprob),
+         ll = log(l))
+
+sum(sgun$ll)
+logLik(mod1_sgun)
+#Is it an issue that the results are slightly different? Why are the other log likelihood comparisons exactly the same while this one isn't?
+```
+
 # Linear Regressions (Gaussian GLMs)
 
 ### First Gaussian GLM
@@ -125,10 +143,10 @@ The odds ratio is exp(-0.781) = 0.4577 which means that the odds of men supporti
 sexweight <- gss2022 |>
   select(weight, sex) |>
   drop_na() |>
-  mutate(sex = if_else(sex <= 1, 1, 0)) |>
-  select(weight, sex)
+  mutate(male = if_else(sex <= 1, 1, 0)) |>
+  select(weight, male)
 
-mod1_sexweight <- lm(weight ~ sex,
+mod1_sexweight <- lm(weight ~ male,
                      data = sexweight)
 
 mytidy(mod1_sexweight)
@@ -136,16 +154,30 @@ mytidy(mod1_sexweight)
 
 The average weight for females is 173 lbs (alpha). Males weigh 24 lbs (beta) more than females. (173 + 24 = 197) The average weight for males is 197 lbs.
 
+#### Log Likelihood Comparison
+
+```{r}
+sexweight <- sexweight |>
+  mutate(mean = predict(mod1_sexweight),
+         sd = sd(mod1_sexweight$residuals)) |>
+  mutate(l = dnorm(weight, mean = mean, sd = sd),
+         ll = dnorm(weight, mean = mean, sd = sd, 
+                    log = TRUE))
+
+sum(sexweight$ll)
+logLik(mod1_sexweight)
+```
+
 ### Second Gaussian GLM
 
 ```{r}
 sextvhours <- gss2022 |>
   select(tvhours, sex) |>
   drop_na() |>
-  mutate(sex = if_else(sex <= 1, 1, 0)) |>
-  select(tvhours, sex)
+  mutate(male = if_else(sex <= 1, 1, 0)) |>
+  select(tvhours, male)
 
-mod1_sextvhours <- lm(tvhours ~ sex,
+mod1_sextvhours <- lm(tvhours ~ male,
                      data = sextvhours)
 
 mytidy(mod1_sextvhours)
@@ -159,14 +191,14 @@ Females watch 3.44 (alpha) hours of TV on average. Males watch .065 (beta) less 
 sexpartners <- gss2022 |>
   select(partnrs5, sex) |>
   drop_na() |>
-  mutate(sex = if_else(sex <= 1, 1, 0)) |>
-  select(partnrs5, sex)
+  mutate(male = if_else(sex <= 1, 1, 0)) |>
+  select(partnrs5, male)
 
-mod1_sexpartners <- glm(partnrs5 ~ sex,
+mod1_sexpartners <- glm(partnrs5 ~ male,
                data = sexpartners,
                family = poisson(link="log"))
 
-sexpartners_table <- table(sexpartners$sex, sexpartners$partnrs5)
+sexpartners_table <- table(sexpartners$male, sexpartners$partnrs5)
 
 print(sexpartners_table)
 mytidy(mod1_sexpartners)
@@ -206,7 +238,7 @@ beta = .59 - .37 = .216 = log rate ratio, or the difference in log sex partners 
 
 exp(.216) = 1.24, which means men have 1.24x, or 24% more sexual partners than women
 
-In LPM style, 1.8 - 1.45 = .35, so males have .35 more siblings than women. Which doesn't make sense, which is why we would not use an identity link model for these variables.
+In LPM style, 1.8 - 1.45 = .35, so males have .35 more siblings than women.
 
 ### Second Poisson GLM
 
@@ -236,3 +268,17 @@ Alpha is 0.9525 log siblings for those with a college degree. Exponentiated, we 
 0.9525 - 0.3130 = 0.6395 log siblings for those without a college degree. Exponentiated, we find that those without a college degree have on average 1.89 siblings.
 
 Beta is 0.3130 log siblings, which means those with a college degree have 0.313 more siblings than those without a college degree. Exponentiated, we get a ratio of 1.37, which means that those with a college degree have 37% more siblings than those without a college degree.
+
+#### Log Likelihood Comparison
+
+```{r}
+sibsdegree <-
+  sibsdegree |>
+  mutate(mean = predict(mod1_sibsdegree, type = "response")) |>
+  mutate(l = dpois(sibs, lambda = mean),
+         ll = dpois(sibs, lambda = mean, 
+                    log = TRUE))
+
+sum(sibsdegree$ll)
+logLik(mod1_sibsdegree)
+```
