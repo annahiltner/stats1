@@ -1,0 +1,457 @@
+---
+title: "Week 12 Homework"
+author: "Anna Hiltner Nouzeilles"
+format: 
+  html:
+    embed-resources: true
+editor: visual
+---
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+library(gssr)
+library(tidyverse)
+library(broom)
+library(here)
+
+gss <- gss_get_yr(year = 2022) |> 
+  haven::zap_labels() 
+```
+
+## Linear Regression (LPM) #1
+
+$$
+\text{E}(\text{proweed}) = \alpha + \beta_1 \cdot \text{relaxed} + \beta_2 \cdot \text{college} + \beta_3 \cdot (\text{relaxed} \cdot \text{college})
+$$
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+
+d <- gss |>
+  select(
+    grass,
+    hrsrelax,
+    degree) |>
+  drop_na() |>
+  mutate(
+    proweed = if_else(grass == 1, 1, 0),
+    relaxed = if_else(hrsrelax >= 3, 1, 0),
+    college = if_else(degree >= 3, 1, 0)
+  )
+
+#table of probs
+
+dt <- d |>
+  summarize(
+    n = n(),
+    pgrass = mean(proweed),
+    .by = c(relaxed, college)) |>
+  arrange(relaxed, college)
+
+print(dt)
+```
+
+### Manual Estimation
+
+$\alpha$ = 0.67 which means people who relax less and don't have a college degree have a 67% probability of supporting marijuana legalization.
+
+$\alpha$ + $\beta_1$ = 0.813 therefore b1 = 0.813 - 0.67 = 0.143 which means people who relax more and do not have a college degree are 14.3 percentage points more likely to support marijuana legalization than those without a degree.
+
+$\alpha$ + $\beta_2$ = 0.729 therefore b2 = 0.729 - 0.67 = 0.059 which means those who relax less and have a college degree are 5.9 percentage points more likely to support marijuana legalization.
+
+$\alpha$ + $\beta_1$ + $\beta_2$ + $\beta_3$ = 0.787 therefore b3 = 0.787 - 0.872 = -0.085 which means a person who relaxes more and has a college degree is 8.5 percentage points more likely to support marijuana than a person who relaxes less and does not have a college degree.
+
+### Confirm
+
+```{r}
+lpm <- lm(proweed ~ college * relaxed,
+          data = d)
+
+tidy(lpm) |> select(term, estimate)
+```
+
+### Restricted Model
+
+```{r}
+lpm3 <- lm(proweed ~ college + relaxed,
+          data = d)
+
+tidy(lpm3) |> select(term, estimate)
+
+AIC(lpm) 
+AIC(lpm3)
+```
+
+The restricted model is preferred because the AIC is lower.
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+# Can also do Likelihood Ratio Test
+
+lrt3 <- anova(lpm3, lpm, test = "Chisq")
+
+tidy(lrt3)
+```
+
+## Logit #1
+
+```{r}
+dt <- dt |>
+  mutate(logodds = log(pgrass / (1 - pgrass)))
+
+dt
+```
+
+### Manual Estimation
+
+$\alpha$ = 0.71 which means among people who relax 2 or less hours a day and do not have a college degree, the log odds of supporting marijuana legalization is 0.71
+
+$\alpha$ + $\beta_1$ = 1.47 therefore $\beta_1$ = 1.47 - 0.71 = 0.76 which means among non-college grads, being more relaxed decreases the log odds of supporting marijuana legalization by 0.76.
+
+$\alpha$ + $\beta_2$ = 0.99 therefore $\beta_2$ = 0.99 - 0.71 = 0.28 which means among those who relax less, having a college degree increases the log odds of supporting marijuana legalization by 0.28.
+
+$\alpha$ + $\beta_1$ + $\beta_2$ + $\beta_3$ = 1.31 therefore $\beta_3$ = 1.31 - 1.75 = -0.44 which means the interaction between relaxing more and having a college degree adds a 0.44 to the log odds of supporting marijuana legalization.
+
+### Confirm
+
+```{r}
+logitm <- glm(proweed ~ college * relaxed,
+              data = d,
+              family = binomial(link = "logit"))
+
+tidy(logitm) |> select(term, estimate)
+```
+
+### Restricted Model
+
+```{r}
+logitm1 <- glm(proweed ~ college + relaxed,
+              data = d,
+              family = binomial(link = "logit"))
+
+tidy(logitm1) |> select(term, estimate)
+
+AIC(logitm) 
+AIC(logitm1)
+```
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+# Can also do the Likelihood Ratio Test
+
+lrt4 <- anova(logitm1, logitm, test = "Chisq")
+
+tidy(lrt4)
+```
+
+The restricted model is preferred because the AIC is lower.
+
+## Poisson #1
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+d1 <- gss |>
+  select(
+    nmbrkids,
+    hrsrelax,
+    degree) |>
+  drop_na() |>
+  mutate(
+    relaxed = if_else(hrsrelax >= 3, 1, 0),
+    college = if_else(degree >= 3, 1, 0),
+  )
+
+#table of probs
+
+dt1 <- d1 |>
+  summarize(
+    n = n(),
+    pkids = mean(nmbrkids),
+    .by = c(relaxed, college)) |>
+  arrange(relaxed, college)
+
+#or
+
+poisson_dt <- d1 |>
+  group_by(relaxed, college) |> 
+  summarize(
+    n = n(),
+    mean_kids = mean(nmbrkids))
+
+print(poisson_dt)
+```
+
+$\alpha$ = log(2.285) which means people who relax less and do not have a college degree have an estimated 0.83 log children.
+
+$\alpha$ + $\beta_1$ = log(1.857) therefore $\beta_1$ = log(1.857) - 0.83 = -0.211 which means a person who does not have a college degree but relaxes more has 0.211 less log children.
+
+$\alpha$ + $\beta_2$ = log(1.932) therefore $\beta_2$ = log(1.932) - 0.83 = -0.17 which means among those who relax less, having a college degree decreases a person's number of log children by 0.17 log siblings
+
+$\alpha$ + $\beta_1$ + $\beta_2$ + $\beta_3$ = log(1.64) therefore $\beta_3$ = log(1.64) - 0.449 = 0.046 which means more relaxed, college-educated people have 0.046 more log children than less relaxed, non-college educated people.
+
+### Confirm
+
+```{r}
+poisson_d <- glm(nmbrkids ~ college * relaxed,
+                data = d1,
+                family = poisson(link = "log"))
+
+tidy(poisson_d) |> select(term, estimate)
+```
+
+### Restricted Model
+
+```{r}
+poisson_d1 <- glm(nmbrkids ~ college + relaxed,
+                data = d1,
+                family = poisson(link = "log"))
+
+tidy(poisson_d1) |> select(term, estimate)
+
+lrt5 <- anova(poisson_d, poisson_d1, test = "Chisq")
+
+AIC(poisson_d)
+AIC(poisson_d1)
+```
+
+The restricted model is preferred here because its AIC is lower.
+
+## Linear Regression (LPM) #2
+
+$$
+\text{E}(\text{liberal}) = \alpha + \beta_1 \cdot \text{relaxed} + \beta_2 \cdot \text{college} + \beta_3 \cdot (\text{relaxed} \cdot \text{college})
+$$
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+k <- gss |>
+  select(polviews,
+         hrsrelax,
+         degree) |>
+  drop_na() |>
+  mutate(liberal = if_else(polviews < 4, 1, 0),
+         relaxed = if_else(hrsrelax >= 3, 1, 0),
+         college = if_else(degree >= 3, 1, 0))
+
+kt <- k |>
+  summarize(n = n(),
+            plib = mean(liberal),
+            .by = c(relaxed, college)) |>
+  arrange(relaxed, college)
+
+print(kt)
+```
+
+### Manual
+
+$\alpha$ = 0.253 which means among people without a college degree who relax 2 or less hours per day, the probability of being liberal is 25.3%
+
+$\alpha$ + $\beta_1$ = 0.252 therefore $\beta_1$ = 0.252 - 0.253 = -0.001 which means among people without a college degree, those who relax 3 or more hours a day are 0.1 percentage points less likely to be liberal than those who relax less.
+
+$\alpha$ + $\beta_2$ = 0.395 therefore $\beta_2$ = 0.395 - 0.253 = 0.142 which means among people who relax 2 or less hours a day, those with a college degree are 14.2 percentage points more likely to be liberal than those without.
+
+$\alpha$ + $\beta_1$ + $\beta_2$ + $\beta_3$ = 0.47 therefore $\beta_3$ = 0.47 - 0.394 = 0.076 which means the additional effect of being both relaxed and college educated on the probability of being liberal is an increase of 7.6 percentage points.
+
+### Confirm
+
+```{r}
+lpm1 <- lm(liberal ~ college * relaxed,
+          data = k)
+
+tidy(lpm) |> select(term, estimate)
+```
+
+### Restricted Model
+
+```{r}
+lpm2 <- lm(liberal ~ college + relaxed,
+          data = k)
+
+tidy(lpm2) |> select(term, estimate)
+```
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+#Likelihood Ratio Test
+
+lrt <- anova(lpm2, lpm1, test = "Chisq")
+
+tidy(lrt)
+```
+
+```{r}
+AIC(lpm1)
+AIC(lpm2)
+```
+
+Since a lower AIC is better, the saturated model is preferred.
+
+## Logit #2
+
+### Manual
+
+```{r}
+#add log odds
+kt <- kt |>
+  mutate(logodds = log(plib / (1 - plib)))
+
+kt
+
+```
+
+$\alpha$ = -1.08 which means among people who relax 2 or less hours a day and do not have a college degree, the log odds of being liberal is -1.08.
+
+$\alpha$ + $\beta_1$ = -1.09 therefore $\beta_1$ = -1.09 + 1.08 = -0.01 which means among non-college grads, being more relaxed decreases the log odds of being liberal by 0.01, or essentially no effect.
+
+$\alpha$ + $\beta_2$ = -0.43 therefore $\beta_2$ = -0.43 + 1.08 = 0.65 which means among those who relax less, having a college degree increases the log odds of being liberal by 0.65, or a 1.91x increase in the odds of being liberal.
+
+$\alpha$ + $\beta_1$ + $\beta_2$ + $\beta_3$ = -0.14 therefore $\beta_3$ = -0.14 + 0.44 = 0.3 which means the interaction between relaxing more and having a college degree adds an 0.3 to the log odds of being liberal.
+
+### Confirm
+
+```{r}
+logitk <- glm(liberal ~ college * relaxed,
+              data = k,
+              family = binomial(link = "logit"))
+
+tidy(logitk) |> select(term, estimate)
+```
+
+### Restricted Model
+
+```{r}
+logitk1 <- glm(liberal ~ college + relaxed,
+              data = k,
+              family = binomial(link = "logit"))
+
+tidy(logitk1) |> select(term, estimate)
+
+AIC(logitk) 
+AIC(logitk1)
+```
+
+The saturated model is preferred as its AIC is lower.
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+#Can also do Likelihood Ratio Test
+
+lrt1 <- anova(logitk1, logitk, test = "Chisq")
+
+tidy(lrt1)
+```
+
+## Poisson #2
+
+\log(\lambda)
+
+$$
+\log(\lambda) = \alpha + \beta_1 \cdot \text{relaxed} + \beta_2 \cdot \text{college} + \beta_3 \cdot (\text{relaxed} \cdot \text{college})
+$$
+
+### Manual
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+k1 <- gss |>
+  select(
+    sibs,
+    hrsrelax,
+    degree) |>
+  drop_na() |>
+  mutate(
+    relaxed = if_else(hrsrelax >= 3, 1, 0),
+    college = if_else(degree >= 3, 1, 0),
+  )
+
+#table of probs
+
+kt1 <- k1 |>
+  summarize(
+    n = n(),
+    psibs = mean(sibs),
+    .by = c(relaxed, college)) |>
+  arrange(relaxed, college)
+
+#or
+
+poisson_kt <- k1 |>
+  group_by(relaxed, college) |> 
+  summarize(
+    n = n(),
+    mean_sibs = mean(sibs))
+
+poisson_kt
+```
+
+$\alpha$ = log(3.84) which means people who relax less and do not have a college degree have an estimated 1.35 log siblings.
+
+$\alpha$ + $\beta_1$ = log(3.55) therefore $\beta_1$ = log(3.55) - 1.35 = -0.08 which means people who relax more and do not have a college degree have 0.08 less log siblings
+
+$\alpha$ + $\beta_2$ = log(2.43) therefore $\beta_2$ = log(2.43) -1.35 = -0.46 which means a person who has a college degree but relaxes less has 0.46 less log siblings.
+
+$\alpha$ + $\beta_1$ + $\beta_2$ + $\beta_3$ = log(2.52) therefore $\beta_3$ = 0.11 which means more relaxed, college-educated people have 0.11 more log siblings than less relaxed, non-college educated people.
+
+### Confirm
+
+```{r}
+poisson_k1 <- glm(sibs ~ college * relaxed,
+                data = k1,
+                family = poisson(link = "log"))
+
+tidy(poisson_k1) |> select(term, estimate)
+```
+
+### Restricted Model
+
+```{r}
+poisson_k2 <- glm(sibs ~ college + relaxed,
+                data = k1,
+                family = poisson(link = "log"))
+
+tidy(poisson_k2) |> select(term, estimate)
+
+AIC(poisson_k1) 
+AIC(poisson_k2)
+```
+
+The saturated model is preferred as its AIC is much lower.
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+#Can also do Likelihood Ratio Test
+
+lrt2 <- anova(poisson_k1, poisson_k2, test = "Chisq")
+
+tidy(lrt2)
+```
